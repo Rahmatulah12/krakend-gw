@@ -1,0 +1,17 @@
+version: '3'
+services:
+  krakend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+      - "8080:8080"
+    volumes:
+      - ./config/krakend.json:/etc/krakend/krakend.json
+    networks:
+      - default
+    extra_hosts:
+      - "localhost:host-gateway"
+    env_file:
+        - ./config/.env

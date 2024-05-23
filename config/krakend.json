@@ -1,0 +1,41 @@
+{
+  "$schema": "https://www.krakend.io/schema/krakend.json",
+  "version": 3,
+  "name": "KrakenD - API Gateway",
+  "timeout": "60s",
+  "cache_ttl": "60s",
+  "output_encoding": "json",
+  "read_timeout": "60s",
+  "write_timeout": "60s",
+  "idle_timeout": "60s",
+  "read_header_timeout": "60s",
+  "plugin": {
+    "pattern": ".so",
+    "folder": "/etc/krakend/plugins/"
+  },
+  "endpoints": [
+    {
+      "endpoint": "/test",
+      "method": "GET",
+      "input_query_strings": ["*"],
+      "output_encoding": "json",
+      "backend": [
+        {
+          "url_pattern": "/test",
+          "input_query_strings": ["*"],
+          "encoding": "json",
+          "method": "GET",
+          "host": ["http://127.0.0.1:8090"]
+        }
+      ]
+    }
+  ],
+  "extra_config": {
+    "plugin/http-server": {
+      "name": ["http-logger"],
+      "http-logger": {
+        "path": "/test"
+      }
+    }
+  }
+}
