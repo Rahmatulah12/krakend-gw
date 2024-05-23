@@ -70,7 +70,7 @@ func (r registerer) registerHandlers(_ context.Context, extra map[string]interfa
 		str, ok := v.(string) // Melakukan type assertion
 		if !ok {
 			fmt.Println("convertion failed, data is not string")
-			continue
+			break
 		}
 		pathsSlice[i] = str
 	}

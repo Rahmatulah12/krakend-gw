@@ -25,7 +25,17 @@
           "input_query_strings": ["*"],
           "encoding": "json",
           "method": "GET",
-          "host": ["http://127.0.0.1:8080"]
+          "host": ["http://127.0.0.1:8090"],
+          "extra_config": {
+                "qos/ratelimit/router": {
+                    "max_rate": 50,
+                    "capacity": 50,
+                    "client_max_rate": 5,
+                    "client_capacity": 5,
+                    "every": "10m",
+                    "strategy": "ip"
+                }
+          }
         }
       ]
     }
