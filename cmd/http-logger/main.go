@@ -62,62 +62,60 @@ func (r registerer) registerHandlers(_ context.Context, extra map[string]interfa
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 
 		// If the requested path is what we defined.
-		if req.URL.Path == path {
-			// The path has to be hijacked:
-			loggers.Debug("request:", html.EscapeString(req.URL.Path))
+		// The path has to be hijacked:
+		loggers.Debug("request:", html.EscapeString(req.URL.Path))
 
-			logLevel := "SUCCESS"
+		logLevel := "SUCCESS"
 
-			reqBody, _ := io.ReadAll(req.Body)
-			req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+		reqBody, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 
-			rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
-			h.ServeHTTP(rec, req)
+		rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		h.ServeHTTP(rec, req)
 
-			if rec.statusCode >= 400 {
-				logLevel = "ERROR"
-			}
-
-			logOutput := fmt.Sprintf(LOG_FORMAT, time.Now().Local().Format(LAYOUT_FORMAT), logLevel, req.Header.Get("User-Agent"), req.URL.String(), req.RemoteAddr, req.Method, rec.statusCode, req.Header, req.URL.Query(), string(reqBody), rec.body.String())
-
-			pathName := os.Getenv("LOG_PATH")
-			if ok, err := pathExists(pathName); !ok {
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				err := os.Mkdir(pathName, os.ModePerm)
-				if err != nil {
-					fmt.Printf("Failed make directory logs: %v\n", err)
-				}
-			}
-
-			var (
-				file     *os.File
-				filename = fmt.Sprintf("%s-%s.log", "http-logger", time.Now().Local().Format("2006-01-02"))
-				path     = fmt.Sprintf("%s%s", pathName, filename)
-			)
-
-			if _, err := os.Stat(path); err != nil {
-				file, err = os.Create(path)
-				if err != nil {
-					fmt.Printf("Failed create file logs: %v\n", err)
-				}
-			} else {
-				file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-				if err != nil {
-					loggers.Error("Failed open file logs: %v\n", err)
-				}
-			}
-			defer file.Close()
-
-			if _, err := file.WriteString(logOutput); err != nil {
-				loggers.Error("Could not write to log file:", err)
-			}
-			loggers.Debug(logOutput)
-
-			rec.flush()
+		if rec.statusCode >= 400 {
+			logLevel = "ERROR"
 		}
+
+		logOutput := fmt.Sprintf(LOG_FORMAT, time.Now().Local().Format(LAYOUT_FORMAT), logLevel, req.Header.Get("User-Agent"), req.URL.String(), req.RemoteAddr, req.Method, rec.statusCode, req.Header, req.URL.Query(), string(reqBody), rec.body.String())
+
+		pathName := os.Getenv("LOG_PATH")
+		if ok, err := pathExists(pathName); !ok {
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			err := os.Mkdir(pathName, os.ModePerm)
+			if err != nil {
+				fmt.Printf("Failed make directory logs: %v\n", err)
+			}
+		}
+
+		var (
+			file     *os.File
+			filename = fmt.Sprintf("%s-%s.log", "http-logger", time.Now().Local().Format("2006-01-02"))
+			path     = fmt.Sprintf("%s%s", pathName, filename)
+		)
+
+		if _, err := os.Stat(path); err != nil {
+			file, err = os.Create(path)
+			if err != nil {
+				fmt.Printf("Failed create file logs: %v\n", err)
+			}
+		} else {
+			file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				loggers.Error("Failed open file logs: %v\n", err)
+			}
+		}
+		defer file.Close()
+
+		if _, err := file.WriteString(logOutput); err != nil {
+			loggers.Error("Could not write to log file:", err)
+		}
+		loggers.Debug(logOutput)
+
+		rec.flush()
 
 		h.ServeHTTP(w, req)
 	}), nil

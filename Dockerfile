@@ -41,10 +41,10 @@ COPY --from=builder /krakend-gw/http-logger.so /etc/krakend/plugins/
 
 # Check the Krakend configuration
 RUN FC_ENABLE=1 \
+    FC_PARTIALS="config/partials" \
     krakend check -t -d -c "/etc/krakend/krakend.json"
 
 # Define the entry point
 ENTRYPOINT FC_ENABLE=1 \
+    FC_PARTIALS="/etc/krakend/config/partials" \
     krakend run -d -c "/etc/krakend/krakend.json" -p $PORT
-
-# CMD ["krakend" "run" "-c" "/etc/krakend/krakend.json"]
