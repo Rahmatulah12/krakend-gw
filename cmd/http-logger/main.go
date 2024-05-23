@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"krakend-gw/pkg/utils"
 	"net/http"
 	"os"
 	"time"
@@ -55,8 +56,24 @@ func (r registerer) registerHandlers(_ context.Context, extra map[string]interfa
 	}
 
 	// The plugin will look for this path:
-	path, _ := config["path"].(string)
-	loggers.Debug(fmt.Sprintf("The plugin is now hijacking the path %s", path))
+	paths, _ := config["paths"].([]interface{})
+	loggers.Debug(fmt.Sprintf("The plugin is now hijacking the paths %v", paths))
+
+	isShowOnStdout, _ := config["is_show_on_stdout"].(bool)
+	loggers.Debug(fmt.Sprintf("show log on terminal %t", isShowOnStdout))
+
+	// Kita ingin mengkonversinya menjadi slice dengan tipe []string
+	pathsSlice := make([]string, len(paths))
+
+	// Iterasi dan lakukan type assertion
+	for i, v := range paths {
+		str, ok := v.(string) // Melakukan type assertion
+		if !ok {
+			fmt.Println("convertion failed, data is not string")
+			continue
+		}
+		pathsSlice[i] = str
+	}
 
 	// return the actual handler wrapping or your custom logic so it can be used as a replacement for the default http handler
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -65,57 +82,59 @@ func (r registerer) registerHandlers(_ context.Context, extra map[string]interfa
 		// The path has to be hijacked:
 		loggers.Debug("request:", html.EscapeString(req.URL.Path))
 
-		logLevel := "SUCCESS"
+		if utils.InArray(html.EscapeString(req.URL.Path), pathsSlice) {
+			logLevel := "SUCCESS"
 
-		reqBody, _ := io.ReadAll(req.Body)
-		req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+			reqBody, _ := io.ReadAll(req.Body)
+			req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 
-		rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
-		h.ServeHTTP(rec, req)
+			rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+			h.ServeHTTP(rec, req)
 
-		if rec.statusCode >= 400 {
-			logLevel = "ERROR"
-		}
-
-		logOutput := fmt.Sprintf(LOG_FORMAT, time.Now().Local().Format(LAYOUT_FORMAT), logLevel, req.Header.Get("User-Agent"), req.URL.String(), req.RemoteAddr, req.Method, rec.statusCode, req.Header, req.URL.Query(), string(reqBody), rec.body.String())
-
-		pathName := os.Getenv("LOG_PATH")
-		if ok, err := pathExists(pathName); !ok {
-			if err != nil {
-				fmt.Println(err)
+			if rec.statusCode >= 400 {
+				logLevel = "ERROR"
 			}
 
-			err := os.Mkdir(pathName, os.ModePerm)
-			if err != nil {
-				fmt.Printf("Failed make directory logs: %v\n", err)
+			logOutput := fmt.Sprintf(LOG_FORMAT, time.Now().Local().Format(LAYOUT_FORMAT), logLevel, req.Header.Get("User-Agent"), req.URL.String(), req.RemoteAddr, req.Method, rec.statusCode, req.Header, req.URL.Query(), string(reqBody), rec.body.String())
+
+			pathName := os.Getenv("LOG_PATH")
+			if ok, err := pathExists(pathName); !ok {
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				err := os.Mkdir(pathName, os.ModePerm)
+				if err != nil {
+					fmt.Printf("Failed make directory logs: %v\n", err)
+				}
 			}
-		}
 
-		var (
-			file     *os.File
-			filename = fmt.Sprintf("%s-%s.log", "http-logger", time.Now().Local().Format("2006-01-02"))
-			path     = fmt.Sprintf("%s%s", pathName, filename)
-		)
+			var (
+				file     *os.File
+				filename = fmt.Sprintf("%s-%s.log", "http-logger", time.Now().Local().Format("2006-01-02"))
+				path     = fmt.Sprintf("%s%s", pathName, filename)
+			)
 
-		if _, err := os.Stat(path); err != nil {
-			file, err = os.Create(path)
-			if err != nil {
-				fmt.Printf("Failed create file logs: %v\n", err)
+			if _, err := os.Stat(path); err != nil {
+				file, err = os.Create(path)
+				if err != nil {
+					fmt.Printf("Failed create file logs: %v\n", err)
+				}
+			} else {
+				file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+				if err != nil {
+					loggers.Error("Failed open file logs: %v\n", err)
+				}
 			}
-		} else {
-			file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-			if err != nil {
-				loggers.Error("Failed open file logs: %v\n", err)
+			defer file.Close()
+
+			if _, err := file.WriteString(logOutput); err != nil {
+				loggers.Error("Could not write to log file:", err)
 			}
-		}
-		defer file.Close()
+			loggers.Debug(logOutput)
 
-		if _, err := file.WriteString(logOutput); err != nil {
-			loggers.Error("Could not write to log file:", err)
+			rec.flush()
 		}
-		loggers.Debug(logOutput)
-
-		rec.flush()
 
 		h.ServeHTTP(w, req)
 	}), nil
