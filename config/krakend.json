@@ -21,11 +21,11 @@
       "output_encoding": "json",
       "backend": [
         {
-          "url_pattern": "/api/live-stream/v1/activities",
+          "url_pattern": "/test",
           "input_query_strings": ["*"],
           "encoding": "json",
           "method": "GET",
-          "host": ["https://api.duniagames.co.id"],
+          "host": ["http://127.0.0.1:8080"],
           "extra_config": {
             "qos/ratelimit/router": {
               "max_rate": 250,
